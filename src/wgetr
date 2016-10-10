@@ -1,0 +1,25 @@
+#!/bin/sh
+
+# Downloads a website, recursively, for offline viewing.
+
+# Required wget args:
+#     -r/--recursive            recursive
+#     -k/--convert-links        convert links to point to local copy
+#     -p/--page-requisites      download images etc. necessary to display page
+#     -np/--no-parent           with -r, don't ascend to parent directory
+
+# Situational wget args:
+#     -c                        continue
+#     -nc                       no clobber
+#     --save-cookies <file>
+#     --load-cookies <file>
+#     --accept-regex <regex>    with -r, whitelist
+#     --reject-regex <regex>    with -r, blacklist
+#     -D/--domains=<list>       comma-separated list of domains to follow
+
+exec wget \
+    --recursive \
+    --convert-links \
+    --page-requisites \
+    --no-parent \
+    "$@"

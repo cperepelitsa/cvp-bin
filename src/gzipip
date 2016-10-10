@@ -1,0 +1,36 @@
+#!/bin/sh
+
+# gzips a file in-place, requiring 0 extra disk space.
+# Hilariously unsafe, in that it overwrites the file's contents as it runs.
+# If at any point the compressed data exceeds the size of uncompressed,
+# gzip headers included, you've lost your file.
+
+function check_fail() {
+    if [ $1 -eq 0 ]; then return; fi
+
+    echo "$2" >&2
+    cat "$3" | sed 's/^/    /g' >&2
+    rm "$3"
+    exit 1
+}
+
+function zip() {
+    log=$(mktemp gzipip-XXXXXXXX)
+
+    gzip -c "$1" | dd of="$1" conv=notrunc &> "$log"
+    check_fail $? "gzip on $1 failed:" "$log"
+
+    new_size=`sed -n '3s/ .*//p' "$log"`
+    check_fail $? "dd failed?" "$log"
+
+    truncate -s "$new_size" "$1"
+    check_fail $? "truncate failed" "$log"
+
+    mv "$1" "$1.gz"
+
+    rm "$log"
+}
+
+for file in "$@"; do
+    zip "$file"
+done

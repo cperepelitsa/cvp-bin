@@ -1,0 +1,70 @@
+#!/bin/sh
+
+# Generates random passwords.
+
+punc='-_,.!@#$%^&*'
+len=16
+num=1
+
+usage() {
+    cat <<-EOF
+		Generates random ASCII passwords.
+		usage: $(basename "$0") [-l LEN] [-n NUM] [-p PUNC]
+
+		All results are checked for the presence of:
+		    - at least one number
+		    - at least one lowercase alphabetic character
+		    - at least one uppercase alphabetic character
+		    - if punctuation marks allowed, at least one of that set
+
+		Options:
+		    -n NUM      number of passwords to generate (default 1)
+		    -l LEN      length of each password (default $len)
+		    -p PUNC     allowed punctuation marks (default '$punc')
+	EOF
+}
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -h)
+            usage
+            exit 0
+            ;;
+        -p)
+            punc="$2"
+            shift; shift
+            ;;
+        -l)
+            len="$2"
+            shift; shift
+            ;;
+        -n)
+            num="$2"
+            shift; shift
+            ;;
+        *)
+            echo "unrecognized argument: '$1'" >&2
+            exit 1
+            ;;
+    esac
+done
+
+# if ']' is in $punc, it must be first
+if [ $(expr index "$punc" ']') -gt 0 ]; then
+    punc=']'$(tr -d ']' <<< "$punc")
+fi
+# if '-' is in $punc, it must be last
+if [ $(expr index "$punc" '-') -gt 0 ]; then
+    punc=$(tr -d '-' <<< "$punc")'-'
+fi
+
+binrange=$(printf '\\000-\\%03o' $(expr 62 + $(expr length "$punc")))
+
+tr -cd "$binrange" < /dev/urandom \
+    | tr "$binrange" 'a-zA-Z0-9'"$punc" \
+    | dd cbs="$len" conv=unblock status=none \
+    | grep '[0-9]' \
+    | if [ ! -z "$punc" ]; then grep '['"$punc"']'; else cat; fi \
+    | grep '[a-z]' \
+    | grep '[A-Z]' \
+    | head -n $num

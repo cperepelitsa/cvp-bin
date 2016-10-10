@@ -1,0 +1,13 @@
+#!/usr/bin/awk -f
+
+# Filters out lines given as arguments from stdin.
+
+BEGIN {
+    delete ARGV[0]
+    for (i in ARGV) {
+        blacklist[ARGV[i]] = 0
+        delete ARGV[i]
+    }
+}
+
+{ if (!($0 in blacklist)) print }

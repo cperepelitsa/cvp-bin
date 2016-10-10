@@ -1,0 +1,44 @@
+#!/bin/bash
+
+termwidth=$(tput cols)
+if [ $? -ne 0 ]; then
+    echo "ERROR retrieving terminal dimensions" >&2
+    exit 1
+fi
+
+let termwidth-=8    # 6 prefix + 2 right pad
+let max_lines=20
+let max_bytes="termwidth * max_lines"
+
+xpaste() {
+    local declare sel
+    case "$1" in
+        p*) sel=primary ;;
+        s*) sel=secondary ;;
+        c*) sel=clipboard ;;
+        *)
+            echo "unrecognized xclip selection: \"$1\"" >&2
+            return 1
+            ;;
+    esac
+    xclip -selection $sel -out
+}
+
+for sel in primary secondary clipboard; do
+    echo "${sel}:"
+
+    read lines bytes < <(xpaste $sel | wc -l -c)
+    if [ "${bytes}" -eq 0 ]; then
+        echo "    (empty)"
+    else
+        xpaste $sel \
+            | head -n "${max_lines}" \
+            | dd status=none bs="${max_bytes}" count=1 \
+            | sed 's/^/    | /'
+        if [ "${bytes}" -gt "${max_bytes}" -o "${lines}" -gt "${max_lines}" ]; then
+            echo "    (truncated)"
+        fi
+    fi
+
+    if [ "${sel}" != "clipboard" ]; then echo; fi
+done

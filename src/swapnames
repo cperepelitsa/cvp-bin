@@ -1,0 +1,22 @@
+#!/bin/sh
+
+# Swaps the names of two files.
+
+if [ $# -ne 2 ]; then
+    echo "usage: $(basename $0) <file1> <file2>" >&2
+    echo "swaps the names of the given files" >&2
+    exit 0
+fi
+
+if [ ! -e "$1" ] && [ ! -h "$1" ] && [ ! -d "$1" ]; then
+    printf "%s: no such file or directory\n" "$1"
+    exit 1
+elif [ ! -e "$2" ] && [ ! -h "$2" ] && [ ! -d "$2" ]; then
+    printf "%s: no such file or directory\n" "$2"
+    exit 1
+fi
+
+tmpfile="$(mktemp -p .)"
+mv "$1" "$tmpfile"
+mv "$2" "$1"
+mv "$tmpfile" "$2"

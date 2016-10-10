@@ -1,0 +1,7 @@
+#!/usr/bin/sed -f
+
+# Wraps stdin in quotes, escaping quotes and backslashes already in them.
+
+s/"/\\"/g
+s/^/"/
+s/$/"/

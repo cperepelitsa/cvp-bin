@@ -1,0 +1,11 @@
+#!/bin/sh
+
+# Outputs the names of directories in the current working directory.
+
+# TODO: any directory, not just pwd
+# TODO: pass on remaining flags to ls (e.g. -l, -a)
+
+find "$PWD" -maxdepth 1 -type d \
+    | grep -v '^\.\.?$' \
+    | sed 's!^.*/\([^/]*\)$!\1!' \
+    | sort

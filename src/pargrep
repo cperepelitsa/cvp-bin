@@ -1,0 +1,18 @@
+#!/bin/awk -f
+
+# usage: pargrep <pattern> [<filename> ...]
+# Outputs paragraphs that begin with the given <pattern>.
+
+# TODO: keep printing until you find a line _at the same indentation_ as marker line
+
+BEGIN {
+    p = 0;
+    newpar = 1;
+    pat = ARGV[1];
+    ARGV[1] = null
+}
+
+$0 ~ pat  { if (newpar) p = 1; }
+$0 !~ pat { newpar = 0; }
+$0 ~ /^$/ { if (p) exit; else newpar = 1 }
+{ if (p) print }
