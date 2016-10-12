@@ -1,0 +1,84 @@
+#!/bin/bash
+
+extract_video() {
+    jq -j \
+        '.streams 
+        | map(select(.codec_type=="video")) 
+        | map("\(.codec_name), \(.width)x\(.height), \(.duration | split(".")[0])s")
+        | join("\n")' \
+        < "$1"
+}
+
+extract_audio() {
+    jq -j \
+        '.streams 
+        | map(select(.codec_type=="audio")) 
+        | map("\(.codec_name), \(.channel_layout), \(.sample_rate) Hz, \(.bit_rate[:-3]) kbps") 
+        | join("\n")' \
+        < "$1"
+}
+
+dump() {
+    if [ ! -f "$1" ]; then
+        echo "$1: no such file" >&2
+        return 1
+    fi
+
+    local logdir="$(mktemp -p '' -d vinf-XXXXXXXX)"
+    local out="${logdir}/out"
+    local err="${logdir}/err"
+
+    ffprobe -loglevel error -of json -show_streams "$1" >"${out}" 2>"${err}"
+    if [ $? -ne 0 ]; then
+        echo "$1: ffprobe error:" >&2
+        sed 's/^/    /' "${err}" >&2
+        rm -r "${logdir}"
+        return 1
+    fi
+
+    video=$(extract_video "${out}" 2>"${err}")
+    if [ $? -ne 0 ]; then
+        echo "$1: error extracting video:" >&2
+        sed 's/^/    /' "${err}" >&2
+        rm -r "${logdir}"
+        return 1
+    fi
+
+    audio=$(extract_audio "${out}" 2>"${err}")
+    if [ $? -ne 0 ]; then
+        echo "$1: error extracting audio:" >&2
+        sed 's/^/    /' "${err}" >&2
+        rm -r "${logdir}"
+        return 1
+    fi
+
+    echo "$1:"
+    if [ -z "${video}" ]; then
+        echo "    (no video)"
+    else
+        sed 's/^/    /' <<< "${video}"
+    fi
+    if [ -z "${audio}" ]; then
+        echo "    (no audio)"
+    else
+        sed 's/^/    /' <<< "${audio}"
+    fi
+
+    rm -r "${logdir}"
+    return 0
+}
+
+main() {
+    rc=0
+    for arg in "$@"; do
+        dump "${arg}"
+        if [ $? -ne 0 ]; then rc=1; fi
+		echo
+    done
+    return "${rc}"
+}
+
+if [ "$1" != "--source" ]; then
+    main "$@"
+    exit $?
+fi
