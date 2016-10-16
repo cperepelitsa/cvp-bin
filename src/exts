@@ -1,0 +1,36 @@
+#!/usr/bin/gawk -f
+
+# Outputs counts of extensions in files given as args or on stdin.
+
+function addExt(bag, name) {
+    n = split(name, parts, ".")
+    if (n > 1) {
+        bag[parts[n]] += 1
+    } else {
+        bag["(none)"] += 1
+    }
+}
+
+BEGIN {
+    delete ARGV[0]  # exec name
+    # default sort is alphabetically by extension
+    PROCINFO["sorted_in"] = "@ind_str_asc"
+
+    # if args were given on command line,
+    # process them now and disable stdin
+    if (length(ARGV) > 0) {
+        for (i in ARGV) {
+            addExt(bag, ARGV[i])
+        }
+        delete ARGV
+        ARGV[1] = "/dev/null"
+    }
+}
+
+{ addExt(bag, $0) }
+
+END {
+    for (ext in bag) {
+        print(bag[ext] " " ext)
+    }
+}
