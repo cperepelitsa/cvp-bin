@@ -3,9 +3,9 @@
 # Outputs counts of extensions in files given as args or on stdin.
 
 function addExt(bag, name) {
-    n = split(name, parts, ".")
-    if (n > 1) {
-        bag[parts[n]] += 1
+    rc = match($0, /.*\.([^./]+)$/, m)
+    if (rc > 0) {
+        bag[m[1]] += 1
     } else {
         bag["(none)"] += 1
     }
