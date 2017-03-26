@@ -1,0 +1,124 @@
+#!/usr/bin/python2
+
+import argparse
+from os.path import basename
+from pipes import quote as shellQuote
+import subprocess
+from subprocess import PIPE, STDOUT
+import sys
+import textwrap
+
+_prog = basename(sys.argv[0])
+
+_usage = textwrap.dedent('''
+    Filters input lines based on what passes (exit 0) given shell command.
+    Each instance of {} in the command is replaced with the input line.
+    If command string does not contain {}, input is appended, instead.
+    For any substitution, the input is always shell-escaped with single quotes.
+
+    By default:
+    - Lines that are empty or contain only whitespace are skipped.
+    - All stdout/stderr is suppressed.
+    - If all inputs fail, exit 1 and show output of first failed call.
+
+    Examples:
+        List files in current directory:
+            $ ls | shf -- test -f
+            $ ls | shf '[ -f {} ]'
+        List files in current directory with more than 30 lines:
+            $ ls | shf '[ $(wc -l {} | cut -d" " -f1) -gt 30 ]'
+''').strip()
+
+def parseArgs(argv):
+    p = argparse.ArgumentParser(prog=_prog, description=_usage,
+            formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument('-v', '--invert', action='store_true',
+            help='invert filter')
+    p.add_argument('-I', '--replace', metavar='STR', default='{}',
+            help='change replace string (default "{}")')
+    p.add_argument('-a', '--allow', choices=['blank','empty','all'],
+            help='do not skip blank lines (/\s+/) and/or empty ("") lines')
+    p.add_argument('-n', '--dry-run', action='store_true',
+            help='do not run anything; only show commands that would be run')
+    p.add_argument('-f', '--force', action='store_true',
+            help='ignore meta-errors, e.g. failed to run command, zero inputs')
+    p.add_argument('command', metavar='COMMAND', nargs='+')
+    return p.parse_args(argv)
+
+def runCmd(cmd):
+    '''
+    On failured to launch, returns (None, None, errorMessage).
+    Otherwise, returns (returnCode, output, None).
+    '''
+    try:
+        p = subprocess.Popen(cmd, shell=True, stdout=PIPE, stderr=STDOUT)
+    except OSError, e:
+        return (None, None, "Command `%s` failed: %s" % (cmd, str(e)))
+    (out, _) = p.communicate()
+    return (p.returncode, out, None)
+
+if __name__ == '__main__':
+    args = parseArgs(sys.argv[1:])
+
+    allError = not args.dry_run
+    atLeastOne = False
+    firstErr = None # (line, cmd, code, output)
+
+    for line in sys.stdin:
+        if line == '' and args.allow not in ['empty', 'all']:
+            continue
+        elif line.strip() == '' and args.allow not in ['blank', 'all']:
+            continue
+        if line.endswith('\n'):
+            line = line[:-1]
+        line = shellQuote(line)
+
+        atLeastOne = True
+
+        cmd = ' '.join(args.command)
+        if '{}' not in cmd:
+            cmd += ' ' + line
+        else:
+            cmd = cmd.replace(args.replace, line)
+        if args.dry_run:
+            print '+', cmd
+            continue
+
+        (rc, out, err) = runCmd(cmd)
+        if err is not None and not args.force:
+            print >>sys.stderr, err
+            sys.exit(1)
+        elif rc == 0:
+            allError = False
+            if not args.invert:
+                print line
+        else:
+            if firstErr is None:
+                firstErr = (line, cmd, rc, out)
+            if args.invert:
+                print line
+
+    if args.force:
+        sys.exit(0)
+
+    if not atLeastOne:
+        print >>sys.stderr, "%s: error: no inputs processed" % _prog
+        sys.exit(1)
+    elif allError:
+        errLine, errCmd, errCode, errOut = firstErr
+        print >>sys.stderr, textwrap.dedent(
+            str.format('''
+                {prog}: error: no inputs passed filter
+                {prog}: first error encountered for input {line}
+                {prog}: command: {cmd}
+                {prog}: exited with code {code}
+            ''',
+            prog=_prog, line=repr(errLine), cmd=repr(errCmd), code=errCode)
+        ).strip()
+        if len(errOut) == 0:
+            print >>sys.stderr, _prog+': (no command output)'
+        else:
+            print >>sys.stderr, _prog+': command output:'
+            errOut = '\n'.join([_prog+':     '+line for line in errOut.split('\n')])
+            print >>sys.stderr, errOut
+        sys.exit(1)

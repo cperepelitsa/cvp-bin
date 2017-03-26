@@ -38,6 +38,8 @@ Most also say useful things when run with "-h" or without arguments.
 
 - **rfile**: choose a random file
 
+- **shf**: filter lines of input according to exit code of a shell command
+
 - **swapnames**: swaps the names of two files
 
 - **thaum**: assistant for the Thaumcraft 4 mod for Minecraft
