@@ -1,0 +1,91 @@
+#!/usr/bin/env ruby
+
+require 'optparse'
+
+def group_file_by_repo(name)
+  src = name == '-' ? STDIN : File.open(name, 'r')
+  installed_by_repo = Hash.new {|h,k| h[k] = []}
+  other_by_repo = Hash.new {|h,k| h[k] = []}
+  cur_pkg = nil
+  src.each_line.with_index do |line, i|
+    if line =~ %r{^aur/([^ ]+) [^(]+ (\[installed[^\]]*\] )?(\(Out of Date\) )?\((\d+)\) \([\d.]+\)$}
+      d = $2.nil? ? other_by_repo : installed_by_repo
+      cur_pkg = {
+        repo: $3.nil? ? 'aur' : 'aur (out of date)',
+        name: $1,
+        votes: $4.to_i,
+        name_with_votes: "#{$1} (#{$4})"
+      }
+      d['aur'].push(cur_pkg)
+    elsif line =~ %r{^([^ /]+)/([^ ]+) [^\[]+(\[installed[^\]]*\])?$}
+      d = $3.nil? ? other_by_repo : installed_by_repo
+      cur_pkg = {repo: $1, name: $2}
+      d[$1].push(cur_pkg)
+    elsif line =~ /^    /
+      cur_pkg[:description] = $'.chomp
+    else
+      raise "error parsing line #{i+1}: #{line.inspect}"
+    end
+  end
+  src.close
+  [installed_by_repo, other_by_repo]
+end
+
+def print_pkg_group(name, pkgs, extra_indent=false)
+  is_aur = pkgs.first.include?(:votes)
+  max_name_len = pkgs.inject(0) do |cur_max, pkg|
+    [cur_max, (is_aur ? pkg[:name_with_votes] : pkg[:name]).length].max
+  end
+  pkgs.sort_by! {|pkg| is_aur ? [-pkg[:votes], pkg[:name]] : pkg[:name]}
+  indent = extra_indent ? '    ' : ''
+  puts indent+name
+  pkgs.each do |pkg|
+    name = is_aur ? pkg[:name_with_votes] : pkg[:name]
+    puts indent+"    #{name.ljust(max_name_len)}  #{pkg[:description]}"
+  end
+end
+
+@repo_order = {
+  'core'              => [0],
+  'extra'             => [1],
+  'community'         => [2],
+  'multilib'          => [3],
+  'local'             => [4],
+  'aur'               => [5],
+  'aur (out of date)' => [6],
+}
+@repo_order.default_proc = proc {|_,k| [@repo_order.length, k]}
+
+def print_repos(repo_map, extra_indent=false)
+  repo_map.keys.sort_by{|repo| @repo_order[repo]}.each.with_index do |repo, i|
+    puts "\n" if i > 0
+    print_pkg_group(repo, repo_map[repo], extra_indent)
+  end
+end
+
+if __FILE__ == $0
+  parser = OptionParser.new do |opts|
+    opts.banner = "usage: #{File.basename($0)} <file|-> [...]"
+    opts.separator "Pretty-prints the output of pacman/yaourt."
+    opts.separator ""
+    opts.separator "Options:"
+    opts.on_tail("-h", "--help", "Prints this help") { puts opts; exit }
+  end
+  if ARGV.empty?
+    puts parser.help()
+    exit(1)
+  end
+
+  installed, other = {}, {}
+  ARGV.each do |filename|
+    i, o = group_file_by_repo(filename)
+    installed.merge!(i) {|_, a, b| a + b}
+    other.merge!(o) {|_, a, b| a + b}
+  end
+  print_headers = !installed.empty? && !other.empty?
+
+  puts "installed:" if print_headers
+  print_repos(installed, print_headers)
+  puts "\n---\n\nnot installed:" if print_headers
+  print_repos(other, print_headers)
+end
