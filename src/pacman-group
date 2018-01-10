@@ -63,24 +63,45 @@ def print_repos(repo_map, extra_indent=false)
   end
 end
 
-if __FILE__ == $0
+EXEC_NAME = File.basename($0)
+
+def parse_args!(argv)
   parser = OptionParser.new do |opts|
-    opts.banner = "usage: #{File.basename($0)} <file|-> [...]"
+    opts.banner = "usage: #{EXEC_NAME} <file|-> [...]"
     opts.separator "Pretty-prints the output of pacman/yaourt."
     opts.separator ""
     opts.separator "Options:"
     opts.on_tail("-h", "--help", "Prints this help") { puts opts; exit }
   end
-  if ARGV.empty?
-    puts parser.help()
-    exit(1)
+  begin
+    parser.parse!(argv)
+  rescue OptionParser::ParseError => e
+    STDERR.puts "error: #{e}"
+    STDERR.puts parser.help()
+    exit 1
   end
+  argv << '-' if argv.empty?
+  return argv
+end
+
+def main
+  inputs = parse_args!(ARGV)
 
   installed, other = {}, {}
-  ARGV.each do |filename|
-    i, o = group_file_by_repo(filename)
-    installed.merge!(i) {|_, a, b| a + b}
-    other.merge!(o) {|_, a, b| a + b}
+  inputs.each do |filename|
+    begin
+      i, o = group_file_by_repo(filename)
+      installed.merge!(i) {|_, a, b| a + b}
+      other.merge!(o) {|_, a, b| a + b}
+    rescue SystemCallError => e
+      raise e unless e.class.name.start_with?('Errno::')
+      syserr = e.class.name.split(':')[-1]
+      msg = syserr == 'ENOENT' && File.symlink?(filename) \
+            ? 'broken symbolic link' \
+            : e.message.sub(/([^@]+) @.*/, '\1').downcase
+      STDERR.puts "error: #{msg} (#{syserr}): #{filename.inspect}"
+      exit 1
+    end
   end
   print_headers = !installed.empty? && !other.empty?
 
@@ -88,4 +109,9 @@ if __FILE__ == $0
   print_repos(installed, print_headers)
   puts "\n---\n\nnot installed:" if print_headers
   print_repos(other, print_headers)
+end
+
+if __FILE__ == $0
+  # Ignore broken pipe; probably means we were piped to `head`.
+  begin main; rescue Errno::EPIPE; end
 end
