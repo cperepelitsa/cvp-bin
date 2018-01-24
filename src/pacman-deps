@@ -1,5 +1,13 @@
 #!/bin/sh
 
+# many TODO:
+# - this is molasses for a meaningfully large number of arguments;
+#   pre-caching everything ahead of time by just reading the `*.db` (.tgz) repos
+#   would probably have huge gains
+# - don't include uninstalled packages (by default, override with flag?)
+# - recurse
+# - graphviz output mode?
+
 EXEC_NAME="$(basename "$0")"
 
 read -r -d '' USAGE <<EOF
