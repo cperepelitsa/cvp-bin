@@ -1,0 +1,11 @@
+#!/bin/sh
+
+if [ $# -eq 0 -o "$1" = '-h' -o "$1" = '--help' ]; then
+    echo "usage: $(basename "$0") <pkg> [...]"
+    exit 0
+fi
+
+for pkg in "$@"; do
+    desc="$(pacman -Si "$pkg" | sed -n 's/^Description *: //p')"
+    echo "${pkg}|${desc}"
+done | column -t -s'|'

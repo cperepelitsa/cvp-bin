@@ -34,6 +34,8 @@ Most also say useful things when run with "-h" or without arguments.
 
 - **minus**: filters out arguments from list given on stdin
 
+- **pacman-desc**: nicely formats one-line summaries of `pacman` packages
+
 - **pacman-deps**: list inverse dependencies for `pacman` packages
 
 - **pacman-group**: reformat output of `pacman` and `yaourt` into columns
