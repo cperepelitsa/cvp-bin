@@ -36,8 +36,6 @@ Most also say useful things when run with "-h" or without arguments.
 
 - **pacman-desc**: nicely formats one-line summaries of `pacman` packages
 
-- **pacman-deps**: list inverse dependencies for `pacman` packages
-
 - **pacman-group**: reformat output of `pacman` and `yaourt` into columns
 
 - **pargrep**: find paragraphs in indented notes
