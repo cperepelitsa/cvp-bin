@@ -9,19 +9,23 @@ def group_file_by_repo(name)
   cur_pkg = nil
   src.each_line.with_index do |line, i|
     if line =~ %r{^aur/([^ ]+) [^(]+ (\[installed[^\]]*\] )?(\(Out of Date\) )?\((\d+)\) \([\d.]+\)$}
+      # AUR package
       d = $2.nil? ? other_by_repo : installed_by_repo
       cur_pkg = {
-        repo: $3.nil? ? 'aur' : 'aur (out of date)',
+        repo: 'aur',
         name: $1,
         votes: $4.to_i,
+        out_of_date: !$3.nil?,
         name_with_votes: "#{$1} (#{$4})"
       }
       d['aur'].push(cur_pkg)
     elsif line =~ %r{^([^ /]+)/([^ ]+) [^\[]+(\[installed[^\]]*\])?$}
+      # local package OR package from an official Arch repo
       d = $3.nil? ? other_by_repo : installed_by_repo
       cur_pkg = {repo: $1, name: $2}
       d[$1].push(cur_pkg)
     elsif line =~ /^    /
+      # package description
       cur_pkg[:description] = $'.chomp
     else
       raise "error parsing line #{i+1}: #{line.inspect}"
@@ -31,8 +35,34 @@ def group_file_by_repo(name)
   [installed_by_repo, other_by_repo]
 end
 
+# returns [result, {out_of_date:, no_votes:, low_votes:}]
+def filter_aur_pkgs(pkgs)
+  counts = {}
+  pkgs, counts[:out_of_date] = pkgs.partition {|p| !p[:out_of_date]}
+  pkgs, counts[:no_votes] = pkgs.partition {|p| p[:votes] > 0}
+  # wild stab at a smart "low vote" filter
+  max_vote = pkgs.map{|p| p[:votes]}.max
+  filter = case
+    when max_vote >= 1000 then
+      proc {|p| p[:votes] >= max_vote / 100}
+    when max_vote >= 100
+      proc {|p| p[:votes] >= max_vote / 10}
+    when max_vote >= 10
+      proc {|p| p[:votes] >= 10}
+    else proc {true}
+  end
+  pkgs, counts[:low_votes] = pkgs.partition(&filter)
+  return [pkgs, Hash[*counts.map{|k,v| [k, v.length]}.flatten]]
+end
+
+def fmt_filtered_counts(counts)
+  counts = counts.select {|_,c| c > 0}
+  return nil if counts.empty?
+  "(omitted #{counts.map{|k,v| "#{v} #{k.to_s.gsub('_',' ')}"}.join(', ')})"
+end
+
 def print_pkg_group(name, pkgs, extra_indent=false)
-  is_aur = pkgs.first.include?(:votes)
+  is_aur = name == 'aur'
   max_name_len = pkgs.inject(0) do |cur_max, pkg|
     [cur_max, (is_aur ? pkg[:name_with_votes] : pkg[:name]).length].max
   end
@@ -52,14 +82,14 @@ end
   'multilib'          => [3],
   'local'             => [4],
   'aur'               => [5],
-  'aur (out of date)' => [6],
 }
 @repo_order.default_proc = proc {|_,k| [@repo_order.length, k]}
 
-def print_repos(repo_map, extra_indent=false)
+def print_repos(repo_map, extra_indent=false, footers={})
   repo_map.keys.sort_by{|repo| @repo_order[repo]}.each.with_index do |repo, i|
     puts "\n" if i > 0
     print_pkg_group(repo, repo_map[repo], extra_indent)
+    puts "    #{'    ' if extra_indent}#{footers[repo]}" unless footers[repo].nil?
   end
 end
 
@@ -103,12 +133,19 @@ def main
       exit 1
     end
   end
+
+  footers = {}
+  if other.include?('aur')
+    other['aur'], filtered = filter_aur_pkgs(other['aur'])
+    footers['aur'] = fmt_filtered_counts(filtered)
+  end
+
   print_headers = !installed.empty? && !other.empty?
 
   puts "installed:" if print_headers
-  print_repos(installed, print_headers)
+  print_repos(installed, print_headers, footers)
   puts "\n---\n\nnot installed:" if print_headers
-  print_repos(other, print_headers)
+  print_repos(other, print_headers, footers)
 end
 
 if __FILE__ == $0
