@@ -44,6 +44,8 @@ Most also say useful things when run with "-h" or without arguments.
 
 - **shf**: filter lines of input according to exit code of a shell command
 
+- **statv**: dumps everything coreutils' `stat` binary can tell you, somewhat nicely
+
 - **swapnames**: swaps the names of two files
 
 - **thaum**: assistant for the Thaumcraft 4 mod for Minecraft

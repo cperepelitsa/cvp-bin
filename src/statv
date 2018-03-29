@@ -1,0 +1,58 @@
+#!/bin/sh
+
+function usage() {
+    cat <<-EOF
+		usage: $(basename "$0") <file>
+		Extremely verbose stat.
+	EOF
+	exit 0
+}
+
+read -r -d '' statfmt <<EOF
+(%%n) file name:    %n
+(%%N) quoted name:  %N
+(%%F) file type:    %F
+
+(%%a) permissions:  %a
+(%%A) permissions:  %A
+(%%u) owner ID:     %u
+(%%U) owner name:   %U
+(%%g) group ID:     %g
+(%%G) group name:   %G
+
+(%%s) size (bytes):        %s
+(%%b) blocks:              %b
+(%%B) block size (bytes):  %B
+(%%o) I/O size hint:       %o
+
+(%%w) created:        %w
+(%%W) created:        %W
+(%%x) accessed:       %x
+(%%X) accessed:       %X
+(%%y) modified:       %y
+(%%Y) modified:       %Y
+(%%z) status change:  %z
+(%%Z) status change:  %Z
+
+(%%i) inode:        %i
+(%%h) hard links:   %h
+(%%m) mount point:  %m
+
+(%%d) device number:        %d
+(%%D) device number (hex):  %D
+(%%f) raw mode (hex):       %f
+
+(%%t) major device type:  %t
+(%%T) minor device type:  %T\n
+EOF
+
+function dump_stat() {
+	exec stat --printf "${statfmt}" "$1"
+}
+
+function main() {
+	[ $# -eq 0 -o "$1" = '-h' -o "$1" = '--help' ] && usage
+	dump_stat "$1"
+}
+
+[ "$1" != '--source' ] && main "$@"
