@@ -40,18 +40,20 @@ def filter_aur_pkgs(pkgs)
   counts = {}
   pkgs, counts[:out_of_date] = pkgs.partition {|p| !p[:out_of_date]}
   pkgs, counts[:no_votes] = pkgs.partition {|p| p[:votes] > 0}
-  # wild stab at a smart "low vote" filter
-  max_vote = pkgs.map{|p| p[:votes]}.max
-  filter = case
-    when max_vote >= 1000 then
-      proc {|p| p[:votes] >= max_vote / 100}
-    when max_vote >= 100
-      proc {|p| p[:votes] >= max_vote / 10}
-    when max_vote >= 10
-      proc {|p| p[:votes] >= 10}
-    else proc {true}
+  if !pkgs.empty?
+    # wild stab at a smart "low vote" filter
+    max_vote = pkgs.map{|p| p[:votes]}.max
+    filter = case
+        when max_vote >= 1000 then
+        proc {|p| p[:votes] >= max_vote / 100}
+        when max_vote >= 100
+        proc {|p| p[:votes] >= max_vote / 10}
+        when max_vote >= 10
+        proc {|p| p[:votes] >= 10}
+        else proc {true}
+    end
+    pkgs, counts[:low_votes] = pkgs.partition(&filter)
   end
-  pkgs, counts[:low_votes] = pkgs.partition(&filter)
   return [pkgs, Hash[*counts.map{|k,v| [k, v.length]}.flatten]]
 end
 
