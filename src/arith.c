@@ -30,6 +30,8 @@ long double *get_vals(size_t *length) {
         if (*endptr != 0 && *endptr != '\n') {
             fprintf(stderr, "invalid number: %s", line);
             continue;
+        } else if (*line == 0 || *line == '\n') {
+            continue;
         }
         if (vals_used == vals_alloc) {
             vals_alloc *= 2;
