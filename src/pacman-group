@@ -98,11 +98,13 @@ end
 EXEC_NAME = File.basename($0)
 
 def parse_args!(argv)
+  filter = true
   parser = OptionParser.new do |opts|
     opts.banner = "usage: #{EXEC_NAME} <file|-> [...]"
     opts.separator "Pretty-prints the output of pacman/yaourt."
     opts.separator ""
     opts.separator "Options:"
+    opts.on("-a", "--all", "Don't filter AUR results") { filter = false }
     opts.on_tail("-h", "--help", "Prints this help") { puts opts; exit }
   end
   begin
@@ -113,14 +115,14 @@ def parse_args!(argv)
     exit 1
   end
   argv << '-' if argv.empty?
-  return argv
+  return {inputs: argv, filter: filter}
 end
 
 def main
-  inputs = parse_args!(ARGV)
+  cfg = parse_args!(ARGV)
 
   installed, other = {}, {}
-  inputs.each do |filename|
+  cfg[:inputs].each do |filename|
     begin
       i, o = group_file_by_repo(filename)
       installed.merge!(i) {|_, a, b| a + b}
@@ -137,7 +139,7 @@ def main
   end
 
   footers = {}
-  if other.include?('aur')
+  if other.include?('aur') and cfg[:filter]
     other['aur'], filtered = filter_aur_pkgs(other['aur'])
     footers['aur'] = fmt_filtered_counts(filtered)
   end
