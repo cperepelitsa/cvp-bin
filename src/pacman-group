@@ -8,37 +8,44 @@ def group_file_by_repo(name)
   other_by_repo = Hash.new {|h,k| h[k] = []}
   cur_pkg = nil
   src.each_line.with_index do |line, i|
-    if line =~ %r{^aur/([^ ]+) [^(]+ (\[installed[^\]]*\] )?(\(Out of Date\) )?\((\d+)\) \([\d.]+\)$}
+    if line.start_with? '    '
+      # package description
+      desc = line.strip
+      desc = "[orphaned] #{desc}" if cur_pkg[:orphaned]
+      desc = "[outdated] #{desc}" if cur_pkg[:out_of_date]
+      cur_pkg[:description] = desc
+      next
+    end
+
+    d = line.include?('(Installed)') ? installed_by_repo : other_by_repo
+    if line =~ %r{^aur/([^ ]+) \S+ \(([-+]\d+) [^\)]+\)}
       # AUR package
-      d = $2.nil? ? other_by_repo : installed_by_repo
       cur_pkg = {
         repo: 'aur',
         name: $1,
-        votes: $4.to_i,
-        out_of_date: !$3.nil?,
-        name_with_votes: "#{$1} (#{$4})"
+        votes: $2.to_i,
+        out_of_date: line.match?(/ \(Out-of-date /),
+        orphaned: line.match?(/ \(Orphaned\)/),
+        name_with_votes: "#{$1} (#{$2})"
       }
-      d['aur'].push(cur_pkg)
-    elsif line =~ %r{^([^ /]+)/([^ ]+) [^\[]+(\[installed[^\]]*\])?$}
+    elsif line =~ %r{^([^ /]+)/([^ ]+)}
       # local package OR package from an official Arch repo
-      d = $3.nil? ? other_by_repo : installed_by_repo
       cur_pkg = {repo: $1, name: $2}
-      d[$1].push(cur_pkg)
-    elsif line =~ /^    /
-      # package description
-      cur_pkg[:description] = $'.chomp
     else
       raise "error parsing line #{i+1}: #{line.inspect}"
     end
+    d[cur_pkg[:repo]].push(cur_pkg)
   end
+
   src.close
   [installed_by_repo, other_by_repo]
 end
 
-# returns [result, {out_of_date:, no_votes:, low_votes:}]
 def filter_aur_pkgs(pkgs)
   counts = {}
   pkgs, counts[:out_of_date] = pkgs.partition {|p| !p[:out_of_date]}
+  pkgs, counts[:orphaned] = pkgs.partition {|p| !p[:orphaned]}
+  pkgs, counts[:neg_votes] = pkgs.partition {|p| p[:votes] >= 0}
   pkgs, counts[:no_votes] = pkgs.partition {|p| p[:votes] > 0}
   if !pkgs.empty?
     # wild stab at a smart "low vote" filter
@@ -135,6 +142,9 @@ def main
             : e.message.sub(/([^@]+) @.*/, '\1').downcase
       STDERR.puts "error: #{msg} (#{syserr}): #{filename.inspect}"
       exit 1
+    rescue RuntimeError => e
+      STDERR.puts "error: #{e.message}"
+      exit 1
     end
   end
 
@@ -147,7 +157,7 @@ def main
   print_headers = !installed.empty? && !other.empty?
 
   puts "installed:" if print_headers
-  print_repos(installed, print_headers, footers)
+  print_repos(installed, print_headers)
   puts "\n---\n\nnot installed:" if print_headers
   print_repos(other, print_headers, footers)
 end
