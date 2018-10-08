@@ -31,7 +31,3 @@ $(addprefix bin/, $(SH_ALL)): bin/%: src/%
 .PHONY: clean
 clean:
 	rm -rf bin
-
-.PHONY: test
-test:
-	@echo $(EXEC_ALL)

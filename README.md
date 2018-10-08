@@ -12,9 +12,6 @@ Most also say useful things when run with "-h" or without arguments.
 
 # Tools
 
-- **approve**: run a program for each of a list of files, then ask whether it should be
-  moved or deleted
-
 - **arith**: outputs some statistical information for a list of numbers
 
 - **badchar**: check files for bytes outside the pretty/printable ASCII range
@@ -22,8 +19,6 @@ Most also say useful things when run with "-h" or without arguments.
 - **cstat**: dumps the C stat(2) struct for a file
 
 - **decolor**: extremely simple `sed` filter to remove terminfo color escapes
-
-- **enquote**: wraps each line in double quotes (and escapes present double quotes)
 
 - **exts**: outputs counts by file extension of a list of files
 
@@ -39,9 +34,7 @@ Most also say useful things when run with "-h" or without arguments.
 
 - **minus**: filters out arguments from list given on stdin
 
-- **pacman-desc**: nicely formats one-line summaries of `pacman` packages
-
-- **pacman-group**: reformat output of `pacman` and `yaourt` into columns
+- **pacman-group**: reformat output of `pacman` and `yay` into columns
 
 - **pargrep**: find paragraphs in indented notes
 
@@ -53,8 +46,6 @@ Most also say useful things when run with "-h" or without arguments.
 
 - **swapnames**: swaps the names of two files
 
-- **thaum**: assistant for the Thaumcraft 4 mod for Minecraft
-
 - **vcut**: runs mpv; screenshots taken determine start/end times for clips to extract
   (requires mpv, ffmpeg, and dc)
 
@@ -62,7 +53,3 @@ Most also say useful things when run with "-h" or without arguments.
   ffmpeg)
 
 - **wgetr**: recursively download an offline copy of a website
-
-- **xclip-dump**: dump contents of X11 clipboards
-
-- **xflush**: clear contents of X11 clipboards

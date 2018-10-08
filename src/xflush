@@ -1,4 +1,0 @@
-#!/bin/sh
-for s in primary secondary clipboard; do
-    xclip -selection $s -i </dev/null
-done
