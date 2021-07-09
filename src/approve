@@ -1,0 +1,173 @@
+#!/bin/zsh
+
+read -d '' USAGE <<EOF
+usage: ${0:t} -c <cmd> [<options>] <file>...
+For each file, runs <cmd> and prompt to delete, move, or skip it.
+Directories given as <file> will be recursed into (unless -d).
+
+<cmd> should be the full command line as one argument, options included.
+Each '{}' in <cmd> will be replaced with the path to the current file/dir.
+
+Options:
+    -a <file>   file to read targets from instead of args
+    -d          do not recurse into dirs; operate on dirs themselves
+    -f          iterate over each path even if it doesn't exist
+    -n          dry run; only show how <prog> and actions would be invoked
+    -t <dir>    destination for the 'move' action (default: ./keep)
+EOF
+
+usage() { cat <<< $USAGE; exit $1; }
+eprintfln() { fmt=$1; shift; printf "%s: error: $fmt\n" "$@" >&2; }
+fatal() { eprintfln "$@"; exit 1; }
+
+SRCS=()
+CMD=
+DIRS=
+IGNORE_MISSING=
+DEST='keep'
+DRY=
+while getopts :a:c:dfhnt: o; do
+    case $o in
+        a)
+            [[ -r "$OPTARG" ]] || fatal '(-a) cannot read %s' "${(qq)OPTARG}"
+            while read p; do SRCS+=( $p ); done < "$OPTARG"
+            ;;
+        c)
+            [[ -n "$OPTARG" ]] || fatal '(-c) command may not be empty'
+            CMD="$OPTARG"
+            ;;
+        d) DIRS=1 ;;
+        f) IGNORE_MISSING=1 ;;
+        h) usage 0 ;;
+        t) 
+            [[ -n "$OPTARG" ]] || fatal '(-t) move destination may not be empty'
+            DEST="$OPTARG"
+            ;;
+        n) DRY=1 ;;
+        :) fatal '(%s) missing argument' "$OPTARG" ;;
+        ?) fatal 'unrecognized flag: %s' "$OPTARG" ;;
+    esac
+done
+SRCS+=( ${argv[OPTIND,-1]} )
+
+TARGETS=()
+for src in "${SRCS[@]}"; do
+    if [[ -d $src ]]; then
+        [[ -n $DIRS ]] && { TARGETS+=( $src ); continue; }
+        TARGETS+=( $src/**/*(N.) )
+    elif [[ -n $IGNORE_MISSING || -e $src ]]; then
+        TARGETS+=( $src )
+    else
+        fatal 'does not exist: %s' "$src"
+    fi
+done
+
+if [[ ${#TARGETS} -eq 0 ]]; then eprintfln 'nothing to process'; usage 1; fi
+
+if [[ ! -d $DEST ]]; then
+    if [[ -n $DRY ]]; then
+        printf '+ mkdir -p -- %s\n\n' "${(q+)DEST}"
+    else
+        mkdir -p "$DEST" || fatal 'failed to create directory %s' "$DEST"
+    fi
+fi
+
+function menu() {
+    local c p
+    local valid="${(j.|.I:2:)@/*/}"
+    for c; do
+        [[ -z $p ]] || p+=', '
+        p+="(${c[1]})${c:1}"
+    done
+    p+=', (q)uit> '
+
+    while; do
+        print -n $p >/dev/tty
+        read -k1 c
+        [[ "$c" = $'\n' ]] || print >/dev/tty
+        case "$c" in
+            $'\n') print "${1[1]}"; return ;;
+            $'\C-D'|q) return 1 ;;
+            ${~valid}) print "$c"; return ;;
+        esac
+    done
+}
+
+function run_cmd() {
+    local cmd
+    if [[ $1 = *'{}'* ]]; then
+        cmd="${CMD//\{\}/$1}"
+    else
+        printf -v cmd '%s %s' "$CMD" "${(q+)1}"
+    fi
+    [[ -n $DRY ]] && { print + $cmd; return 0; }
+    (set -o pipefail; eval $cmd)
+    local rc="$?"
+    [[ $rc -eq 0 ]] && return 0
+    printf '! command terminated with status %d\n' $rc
+    return $rc
+}
+
+function input_filename() {
+    local p; printf -v p 'mv %s -> ' "${(q+)1}"
+    # rlwrap options:
+    #     -o    send EOF after one line
+    #     -S=   prompt
+    #     -P=   initial content
+    #     -c    tab-complete filenames
+    #     -e=   string to append after tab-complete (default ' ')
+    rlwrap -o -S "$p" -P "$2" -ce '' cat
+}
+
+function keep_one() {
+    while; do
+        local dst="$(input_filename "$1" "$DEST/${1:t}")"
+        [[ $? -eq 0 && -n "$dst" ]] || return 1
+        if [[ ! -d "${dst:h}" ]]; then
+            printf 'parent directory does not exist: %s\n' "${(q+)dst:h}"
+            local c="$(menu create rename skip)"
+            case "$c" in
+                s) printf 'skipping %s\n' "${(q+)1}"; return 0 ;;
+                r) continue ;;
+                c)
+                    if [[ -n "$DRY" ]]; then
+                        printf '+ mkdir -p %s\n' "${(q+)dst:h}"
+                    else
+                        mkdir -p "${dst:h}" && break
+                    fi
+                    print 'error creating parent dir'
+                    continue
+                    ;;
+            esac
+        fi
+        [[ -n "$DRY" ]] \
+            && printf '+ mv %s %s\n' "${(q+)1}" "${(q+)dst}" \
+            || mv "$1" "$dst"
+        return $?
+    done
+}
+
+function approve_one() {
+    printf 'file: %s\n' "${(q+)1}"
+    while; do
+        run_cmd "$1"
+        c="$(menu skip rerun keep delete)"
+        [[ $? -eq 0 ]] || return 1
+        case "$c" in
+            s) printf 'skipping %s\n' "${(q+)1}"; return ;;
+            r) continue ;;
+            k) keep_one "$1" && return || continue ;;
+            d)
+                printf 'deleting %s\n' "${(q+)1}"
+                [[ -n "$DRY" ]] && printf '+ rm %s\n' "${(q+)1}" || rm "$1"
+                return $?
+                ;;
+            *) return 1 ;;
+        esac
+    done
+}
+
+for t in $TARGETS; do
+    approve_one $t || exit 1
+    print
+done

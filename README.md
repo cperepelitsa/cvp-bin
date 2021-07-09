@@ -12,6 +12,8 @@ Most also say useful things when run with "-h" or without arguments.
 
 # Tools
 
+- **approve**: run a command for each file, prompt to keep or delete (requires zsh and rlwrap)
+
 - **arith**: outputs some statistical information for a list of numbers
 
 - **badchar**: check files for bytes outside the pretty/printable ASCII range
@@ -49,7 +51,6 @@ Most also say useful things when run with "-h" or without arguments.
 - **vcut**: runs mpv; screenshots taken determine start/end times for clips to extract
   (requires mpv, ffmpeg, and dc)
 
-- **vinf**: dump basic audio and video encoding information for media files (requires
-  ffmpeg)
+- **vinf**: dump basic audio and video encoding information for media files (requires ffmpeg)
 
 - **wgetr**: recursively download an offline copy of a website
