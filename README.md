@@ -14,6 +14,8 @@ Most also say useful things when run with "-h" or without arguments.
 
 - **approve**: run a command for each file, prompt to keep or delete (requires zsh and rlwrap)
 
+- **apt-search**: APT package search with more pleasant output
+
 - **arith**: outputs some statistical information for a list of numbers
 
 - **badchar**: check files for bytes outside the pretty/printable ASCII range
@@ -26,7 +28,15 @@ Most also say useful things when run with "-h" or without arguments.
 
 - **genpass**: generates passwords
 
+- **git-squash**: squash commits in a dev branch into a single commit
+
 - **gzipip**: compresses a file in-place (risky!)
+
+- **joinl**: joins consecutive lines of text
+
+- **jsonpp**: JSON pretty-printer with actually helpful options (requires `jq`)
+
+- **manless**: wrapper that adds a simple theme to the `less` pager when viewing `man` pages
 
 - **minus**: filters out arguments from list given on stdin
 
@@ -39,3 +49,9 @@ Most also say useful things when run with "-h" or without arguments.
 - **statv**: dumps everything coreutils' `stat` binary can tell you, somewhat nicely
 
 - **swap**: swaps the names of two files
+
+- **tcopy**: copies stdin to a tmux buffer
+
+- **tpaste**: pastes last tmux-buffer to stdout
+
+- **xmlpp**: XML/HTML pretty-printer with actually helpful options (requires `xmllint`)

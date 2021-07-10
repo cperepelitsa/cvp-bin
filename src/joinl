@@ -1,0 +1,41 @@
+#!/usr/bin/gawk -E
+
+@include "getopt.awk"
+
+BEGIN {
+    N = 2
+    D = " "
+    S = ""
+    Opterr = 0
+    while ((c = getopt(ARGC, ARGV, "hd:n:s")) != -1) {
+        switch (c) {
+            case "h": {
+                print "usage: joinl [-n N] [-d D] [-s] [<file> ...]"
+                print "Joins every N (default 2) consecutive lines with string D (default ' ')."
+                print "The -s option strips whitespace from each line before joining."
+                exit 0
+            }
+            case "d": { D = Optarg; break }
+            case "n": { N = Optarg; break }
+            case "s": { S = 1; break }
+            default: {
+                printf("joinl: error: invalid option \"%s\"\n", Optopt)
+                exit 1
+            }
+        }
+    }
+    for (i = 1; i < Optind; i++) { ARGV[i] = "" }
+    n = N
+}
+
+n > 0 {
+    if (S) { gsub(/^\s+|\s+$/, "") }
+    line = (n < N) ? line D $0 : $0
+    n--
+}
+
+n == 0 { print line; n = N; line = "" }
+
+END {
+    if (line) { print line }
+}

@@ -1,0 +1,49 @@
+#!/bin/bash
+
+set -e
+
+root=
+while [ $# -gt 0 ]; do
+    case "$1" in
+    -h|--help)
+        echo "usage: $(basename "$0") [branch]"
+        echo "Squashes all commits since given branch (default 'master') into one."
+        exit 0
+        ;;
+    *)
+        if [ ! -z "${root}" ]; then
+            echo "$(basename "$0"): excess arguments: $*" 2>&1
+            exit 1
+        fi
+        root="$1"
+        ;;
+    esac
+    shift
+done
+
+[ -z "${root}" ] && root='master'
+
+branch="$(git rev-parse --abbrev-ref HEAD)"
+first_hash="$(git merge-base "${root}" "${branch}")"
+num_commits="$(git rev-list --count "${first_hash}..")"
+if [ "${num_commits}" -lt 2 ]; then
+    [ "${num_commits}" -eq 0 ] && msg='no commits' || msg='only one commit'
+    echo "Branch has ${msg}; aborting."
+    exit 1
+fi
+
+echo "Squashing ${num_commits} commits:"
+git log --oneline "${first_hash}.."
+echo
+echo -n "Okay? "
+read reply
+case "${reply}" in
+    [yY]*) ;;
+    *)
+        echo "Aborting."
+        exit 1
+        ;;
+esac
+
+GIT_EDITOR="sed -i '2,${num_commits}s/^pick/squash/'" git rebase -i HEAD~"${num_commits}"
+exec git commit --amend
