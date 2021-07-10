@@ -1,6 +1,0 @@
-#!/bin/sh
-
-find "$PWD" -mindepth 1 -maxdepth 1 -type d \
-    | grep -v '^\.\.?$' \
-    | sed 's!^.*/\([^/]*\)$!\1!' \
-    | sort

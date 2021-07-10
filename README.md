@@ -20,23 +20,15 @@ Most also say useful things when run with "-h" or without arguments.
 
 - **cstat**: dumps the C stat(2) struct for a file
 
-- **decolor**: extremely simple `sed` filter to remove terminfo color escapes
+- **decolor**: removes terminfo color escapes from text
 
 - **exts**: outputs counts by file extension of a list of files
 
-- **floatdump**: dumps IEEE 754 binary representation of floats
-
 - **genpass**: generates passwords
 
-- **gzipip**: compresses a file in-place (very dangerous)
-
-- **lsd**: list directories in current working dir
-
-- **lsf**: list files in current working dir
+- **gzipip**: compresses a file in-place (risky!)
 
 - **minus**: filters out arguments from list given on stdin
-
-- **pacman-group**: reformat output of `pacman` and `yay` into columns
 
 - **pargrep**: find paragraphs in indented notes
 
@@ -46,11 +38,4 @@ Most also say useful things when run with "-h" or without arguments.
 
 - **statv**: dumps everything coreutils' `stat` binary can tell you, somewhat nicely
 
-- **swapnames**: swaps the names of two files
-
-- **vcut**: runs mpv; screenshots taken determine start/end times for clips to extract
-  (requires mpv, ffmpeg, and dc)
-
-- **vinf**: dump basic audio and video encoding information for media files (requires ffmpeg)
-
-- **wgetr**: recursively download an offline copy of a website
+- **swap**: swaps the names of two files

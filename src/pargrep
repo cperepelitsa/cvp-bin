@@ -1,18 +1,72 @@
-#!/bin/awk -f
-
-# usage: pargrep <pattern> [<filename> ...]
-# Outputs paragraphs that begin with the given <pattern>.
-
-# TODO: keep printing until you find a line _at the same indentation_ as marker line
+#!/usr/bin/gawk -E
 
 BEGIN {
-    p = 0;
-    newpar = 1;
-    pat = ARGV[1];
-    ARGV[1] = null
+    switch (ARGV[1]) {
+        case /^(-h|--help)$/:
+            print "usage: pargrep [-i|-I] <prefix> [...]"
+            print "Outputs the first paragraph in each input beginning with <prefix>,"
+            print "until the next unindented, non-blank line."
+            print "\nOptions:"
+            print "    -i   Search for <prefix> in indented lines as well, and output lines until"
+            print "         the next non-blank line indented the same amount or less."
+            print "    -I   As -i, but strip common indentation from the output."
+            exit 0
+        case "-I":
+            strip = 1
+        case "-i":
+            iflag = 1
+            prefix = "^\\s*" ARGV[2]
+            delete ARGV[2]
+            break
+        case "":
+            print "error: missing argument" >"/dev/stderr"
+            exit 1
+        default:
+            prefix = "^" ARGV[1]
+    }
+    delete ARGV[1]
+    status = 0
 }
 
-$0 ~ pat  { if (newpar) p = 1; }
-$0 !~ pat { newpar = 0; }
-$0 ~ /^$/ { if (p) exit; else newpar = 1 }
-{ if (p) print }
+BEGINFILE {
+    scanning = 1
+    printing = 0
+    striplen = 0
+    blanks = 0
+}
+
+scanning && $0 ~ prefix {
+    if (iflag) {
+        match($0, /^\s*/, a)
+        indent = "^" a[0] "\\s"
+        if (strip) striplen = RLENGTH + 1
+    } else {
+        indent = "^\\s"
+    }
+    print substr($0, striplen)
+    scanning = 0; printing = 1
+    next
+}
+
+printing {
+    if ($0 ~ indent) {
+        for (i = 0; i < blanks; i++) print ""
+        blanks = 0
+        print substr($0, striplen)
+    } else if (NF == 0) {
+        blanks++
+    } else {
+        nextfile
+    }
+}
+
+ENDFILE {
+    if (scanning) {
+        print FILENAME ": no match" >"/dev/stderr"
+        status = 1
+    }
+}
+
+END {
+    exit status
+}
