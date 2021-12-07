@@ -46,6 +46,8 @@ Most also say useful things when run with "-h" or without arguments.
 
 - **swapnames**: swaps the names of two files
 
+- **tdiff**: outputs duration between timestamps
+
 - **vcut**: runs mpv; screenshots taken determine start/end times for clips to extract
   (requires mpv, ffmpeg, and dc)
 

@@ -1,0 +1,216 @@
+#!/bin/zsh
+
+EXEC_FULL=${(%):-%x}
+EXEC_DIR=${EXEC_FULL:h}
+EXEC=${EXEC_FULL:t}
+
+read -d '' USAGE <<EOF
+usage: $EXEC [options] [<date> ...]
+Outputs time elapsed since each <date>.
+Dates are read from stdin if none are found as arguments.
+A <date> in the future will produce negative values.
+
+Options:
+    -t <time>   use <time> instead of now
+    -f <fmt>    output format; see below
+    -d          enable debug logging
+
+Output formats (-f):
+    (default)
+        "<y> years, <mo> months, <d> days, [etc]", omitting zeroes
+    'years', 'months', 'weeks', 'days', 'hours', 'minutes', 'seconds'
+        output only the number of these that have fully elapsed
+    <number>
+        output only the number of intervals of this length in seconds
+    'hms'
+        "HH:MM:SS"
+    'hms-'
+        as 'hms', but the largest denomination is not padded to 2 digits,
+        and "HH:" / "HH:MM:" is omitted if total is under 1 hour / 1 minute
+    'iso'
+        (a format inspired by, but that most definitely isn't, ISO-8601)
+        "[<D>d][<H>h][<M>m][<S>s]"
+        e.g. "11h4s" for what 'hms' would output as "11:00:04"
+EOF
+
+usage() { cat <<< $USAGE; exit $1; }
+eprintfln() { local fmt=$1; shift; printf "$fmt\n" "$@" >&2; }
+dbglog() {
+    [[ -n $DEBUG ]] || return 0
+    local fmt=$1; shift
+    eprintfln "[dbg] $fmt" "$@"
+}
+errlog() {
+    local fmt=$1; shift
+    eprintfln "\e[1;31m${EXEC}:\e[0m $fmt" "$@"
+}
+fatal() {
+    errlog "$@"
+    exit 1
+}
+
+# seconds per...
+S_YEAR=$(( 60 * 60 * 24 * 365.25 ))
+S_MONTH=$(( 60 * 60 * 24 * 365.25 / 12 ))
+S_WEEK=$(( 60 * 60 * 24 * 7 ))
+S_DAY=$(( 60 * 60 * 24 ))
+S_HOUR=$(( 60 * 60 ))
+S_MINUTE=$(( 60 ))
+
+DEBUG=
+FMT=
+INTERVAL=0
+INTS=
+NOW=$(date +'%s')
+while getopts :hdf:it: opt; do
+    case $opt in
+        h) usage 0 ;;
+        d) DEBUG=1 ;;
+        i) INTS=1; dbglog 'flag -i' ;;
+        f)
+            if [[ $OPTARG =~ '^(iso|hms[1-9]?-?)$' ]]; then
+                FMT="$OPTARG"
+            elif [[ $OPTARG =~ '^[1-9][0-9]*(\.[0-9]+)?$' ]]; then
+                if (( $OPTARG <= 0 )); then
+                    fatal 'flag -f has invalid interval: %s' "${(qq)$OPTARG}"
+                fi
+                INTERVAL="$OPTARG"
+            else
+                case $OPTARG in
+                    y*)  INTERVAL=$S_YEAR ;;
+                    mo*) INTERVAL=$S_MONTH ;;
+                    w*)  INTERVAL=$S_WEEK ;;
+                    d*)  INTERVAL=$S_DAY ;;
+                    ho*) INTERVAL=$S_HOUR ;;
+                    mi*) INTERVAL=$S_MINUTE ;;
+                    s*)  INTERVAL=1 ;;
+                    *) fatal 'flag -f has invalid argument: %s' "${(qq)OPTARG}" ;;
+                esac
+            fi
+            if (( INTERVAL > 0 )); then FMT='interval'; fi
+            dbglog 'flag -f=%s -> FMT=%s, INTERVAL=%d' "${(q+)OPTARG}" $FMT $INTERVAL
+            ;;
+        t)
+            NOW=$(date -d $OPTARG +'%s' 2>&1)
+            if [[ $? -ne 0 ]]; then
+                errlog 'flag -t has invalid argument: %s' "${(qq)OPTARG}"
+                fatal '(`date` output: %s)' "${(qqq)NOW}"
+            fi
+            dbglog 'flag -t=%s -> @%d (%s)' "${(qq)OPTARG}" $NOW "$(date -d @$NOW)"
+            ;;
+        :) fatal 'flag -%s requires a value' "$OPTARG" ;;
+        ?) fatal 'unrecognized flag: -%s' "$OPTARG" ;;
+    esac
+done
+ARGS=( ${argv[OPTIND,-1]} )
+dbglog 'NOW = @%d (%s)' $NOW "$(date -d @$NOW)"
+dbglog 'FMT=%s, INTERVAL=%d\n' "${(qqq)FMT}" $INTERVAL
+
+fmt_default() {
+    local -i d=$1
+    if [[ -z $d || $d -eq 0 ]]; then print '0 seconds'; return; fi
+
+    local -a labels=( 'year' 'month' 'week' 'day' 'hour' 'minute' 'second' )
+    local -a lengths=( $S_YEAR $S_MONTH $S_WEEK $S_DAY $S_HOUR $S_MINUTE 1 )
+    local -i i n=${#labels} x rest len
+    local label
+    local -a parts
+    for (( i=1; i<=n; i++ )); do
+        len=${lengths[$i]}
+        if (( d < len )); then continue; fi
+        rest=$(( d % len ))
+        x=$(( (d-rest) / len ))
+        label=${labels[$i]}
+        if (( x != 1 )); then label+='s'; fi
+        parts+=( "$x $label" )
+        d=$rest
+    done
+    print "${(j., .)parts}"
+}
+
+fmt_interval() {
+    local x
+    printf -v x '%.2f' $(( $1 / $INTERVAL ))
+    print ${x%.00}
+}
+
+fmt_hms() {
+    local -i d=$1 h m s
+    h=$((d / S_HOUR))
+    d=$((d % S_HOUR))
+    m=$((d / S_MINUTE))
+    s=$((d % S_MINUTE))
+    if [[ $FMT = 'hms' ]]; then
+        printf '%02d:%02d:%02d\n' $h $m $s
+    elif (( h == 0 && m == 0 )); then
+        print $s
+    elif (( h == 0 )); then
+        printf '%d:%02d\n' $m $s
+    else
+        printf '%d:%02d:%02d\n' $h $m $s
+    fi
+}
+
+fmt_iso() {
+    local -i d=$1
+    if (( d == 0 )); then print '0s'; return; fi
+
+    local -a labels=( 'd' 'h' 'm' 's' )
+    local -a lengths=( $S_DAY $S_HOUR $S_MINUTE 1 )
+    local -i i len x
+    local label out
+    for (( i=1; i <= ${#labels}; i++ )); do
+        label=${labels[$i]}
+        len=${lengths[$i]}
+        if (( d < len )); then continue; fi
+        x=$((d/len))
+        d=$((d%len))
+        out+="$x$label"
+    done
+    print $out
+}
+
+process_arg() {
+    local t=$(date -d "$1" +'%s' 2>&1)
+    if [[ $? -ne 0 ]]; then
+        errlog 'failed to parse as date: %s' "${(q+)1}"
+        errlog '(`date` output: %s)' "${(qqq)t}"
+        return 1
+    fi
+    dbglog '%s -> %d (%s)' "${(qqq)1}" $t "$(date -d @$t)"
+
+    local d=$(( NOW - t ))
+    dbglog 'diff = %d seconds' $d
+    case "$FMT" in
+        '')       fmt_default $d ;;
+        interval) fmt_interval $d ;;
+        hms*)     fmt_hms $d ;;
+        iso)      fmt_iso $d ;;
+        *) fatal 'FMT has unexpected value: %s' "${(qqq)FMT}" ;;
+    esac
+    return $?
+}
+
+rc=0
+date_num=0
+if [[ ${#ARGS} -gt 0 ]]; then
+    dbglog 'reading %d dates from command line args' ${#ARGS}
+    for arg in "${ARGS[@]}"; do
+        ((date_num++))
+        dbglog 'read date #%d: %s' $date_num "${(qqq)arg}"
+        process_arg "$arg"
+        if [[ $? -ne 0 ]]; then rc=1; fi
+    done
+else
+    dbglog 'no command line args; reading dates from stdin'
+    while read -r arg; do
+        if [[ -n $arg ]]; then
+            ((date_num++))
+            dbglog 'read date #%d: %s' $date_num "${(qqq)arg}"
+            process_arg "$arg"
+            if [[ $? -ne 0 ]]; then rc=1; fi
+        fi
+    done
+fi
+
+exit $rc
