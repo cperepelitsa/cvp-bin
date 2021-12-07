@@ -1,0 +1,94 @@
+#!/bin/bash
+
+exec_name="$(basename "$0")"
+
+cmd='xmllint --format'
+case "${exec_name}" in
+xml*) ext='xml'; format='XML' ;;
+html*) ext='html'; format='HTML'; cmd="${cmd} --html" ;;
+*) echo "${exec_name}: error determining format from argv[0]" >&2; exit 1 ;;
+esac
+
+export XMLLINT_INDENT="${XMLLINT_INDENT:-    }"
+
+function usage() {
+    cat <<EOF
+usage: ${exec_name} [-i] [--] [<file> ...]
+Pretty-prints ${format}.
+Given no arguments, formats stdin and writes to stdout.
+Otherwise, creates corresponding files with the extension ".pp.${ext}".
+
+Options:
+    -i            in-place; overwrite original file (ignored for stdin)
+    -n            dry run; just print commands that would be executed
+    --            stop interpreting command-line options
+    -h, --help    show this usage information
+EOF
+}
+
+inplace='false'
+declare -a srcs
+endparams='false'
+dry='false'
+while [ $# -gt 0 -a "${endparams}" = 'false' ]; do
+    case "$1" in
+        -h|--help) usage; exit 0 ;;
+        -i) inplace='true' ;;
+        -n) dry='true' ;;
+        --) endparams='true' ;;
+        *) srcs+=( "$1" ) ;;
+    esac
+    shift
+done
+srcs+=( "$@" )
+
+if [ "${#srcs[@]}" -eq 0 ]; then
+    srcs+=( '-' )
+fi
+
+for src in "${srcs[@]}"; do
+    if [ "${src}" = '-' ]; then
+        dst=
+    elif [ "${inplace}" = 'true' ]; then
+        if [ "${dry}" = 'true' ]; then
+            dst='%tmp'
+        else
+            dst="$(mktemp -t "${exec_name}.XXXXXXXX")"
+        fi
+    else
+        dst="${src%.$ext}.pp.${ext}"
+    fi
+
+    if [ "${dry}" = 'true' ]; then
+        if [ "${src}" = '-' ]; then
+            printf '+ %s -\n' "${cmd}"
+        else
+            printf '+ %s %q > %q\n' "${cmd}" "${src}" "${dst}"
+        fi
+    else
+        if [ "${src}" = '-' ]; then
+            ${cmd} -
+        else
+            ${cmd} "${src}" > "${dst}"
+        fi
+
+        rc=$?
+        if [ "${rc}" -ne 0 ]; then
+            printf '%s: %q: xmllint exited with %d\n' "${exec_name}" "${src}" "${rc}" >&2
+            exit 1
+        fi
+    fi
+
+    if [ "${src}" != '-' -a "${inplace}" = 'true' ]; then
+        if [ "${dry}" = 'true' ]; then
+            printf '+ mv %q %q\n' "${dst}" "${src}"
+        else
+            mv "${dst}" "${src}"
+            rc=$?
+            if [ "${rc}" -ne 0 ]; then
+                printf '%s: %q: mv error when replacing with %q\n' "${exec_name}" "${src}" "${dst}" >&2
+                exit 1
+            fi
+        fi
+    fi
+done

@@ -1,0 +1,35 @@
+#!/bin/zsh
+
+# termcap
+#     md        start bright/bold
+#     me        end bright/bold
+#     us        start underline
+#     ue        end underline
+
+# control sequence
+#     \e[1m     bright (bold)
+#     \e[4m     underline
+#     \e[30m    black  
+#     \e[31m    red    
+#     \e[32m    green  
+#     \e[33m    yellow 
+#     \e[34m    blue   
+#     \e[35m    magenta
+#     \e[36m    cyan   
+#     \e[37m    white  
+
+
+export LESS_TERMCAP_md=$'\e[34;1m'  # bold: bright blue
+export LESS_TERMCAP_me=$'\e[0m'
+
+export LESS_TERMCAP_us=$'\e[36;4m'  # underline: 
+export LESS_TERMCAP_ue=$'\e[0m'
+
+# less
+#     -R    interpret ANSI escapes
+# (usually on, but off here:)
+#     -F    exit immediately if content is less than 1 screen
+#     -X    skip termcap init, including side-effect of clearing screen
+export LESS='R'     # interpret ANSI escapes
+
+exec less "$@"

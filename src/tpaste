@@ -1,0 +1,47 @@
+#!/bin/bash
+
+# usage: tpaste [-b] [<buf>]
+# <buf> can be:
+#   - omitted: last saved buffer (equivalent to '-1')
+#   - a string: buffer by name
+#   - an int > 0: selects "bufferNNNN"
+#   - an int < 0: selects nth last saved buffer
+# (`-b` does nothing; defined & handled because muscle memory, lol)
+
+# no arg; just paste last buffer
+[ -z "$1" ] && exec tmux save-buffer -
+
+# ignore '-b'
+[ "$1" = '-b' ] && shift
+
+[[ "$1" =~ ^(-)?([0-9]+)$ ]]
+# arg is the name of a buffer; paste that one
+[ -z "${BASH_REMATCH[0]}" ] && exec tmux save-buffer -b "$1" -
+
+neg="${BASH_REMATCH[1]}"
+n="${BASH_REMATCH[2]}"
+
+if [ -z "$neg" ]; then
+    # arg is an int; apply tmux's default buffer name formatting
+    printf -v b 'buffer%04d' "$n"
+    exec tmux save-buffer -b "$b" -
+fi
+
+# arg is "-n", paste nth last saved buffer
+declare -a bufs
+while read -d $'\n' b; do bufs+=( "$b" ); done \
+    < <(tmux list-buffers -F '#{buffer_name}')
+if [ "${#bufs[@]}" -lt "$n" ]; then
+    # check out this bike shed:
+    msg='tpaste: cannot paste'
+    case $n in [01]) ;; 2) msg+=' 2nd' ;; 3) msg+=' 3rd' ;; *) msg+=" ${n}th" ;; esac
+    msg+=' last buffer: '
+    case ${#bufs[@]} in
+        0) msg+='no buffers exist' ;;
+        1) msg+='only 1 buffer exists' ;;
+        *) msg+="only ${#bufs[@]} buffers exist" ;;
+    esac
+    echo "$msg" >&2
+    exit 1
+fi
+exec tmux save-buffer -b "${bufs[$((n-1))]}" -

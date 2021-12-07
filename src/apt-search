@@ -1,0 +1,15 @@
+#!/bin/bash
+
+declare -A installed
+while read pkg; do installed["${pkg}"]='i'; done \
+    < <(dpkg-query -W -f '${db:status-abbrev}${package}\n' | sed -n 's/^.i.//p')
+
+found=0
+apt-cache search "$@" \
+| sort | sed 's/ - /|/' | column -s'|' -t \
+| while read line; do
+    ((found++))
+    pkg="${line%% *}"
+    echo "${installed["${pkg}"]:- } ${line}"
+done
+(( found > 0 ))

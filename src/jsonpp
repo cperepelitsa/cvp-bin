@@ -1,0 +1,78 @@
+#!/bin/bash
+
+exec_name="$(basename "$0")"
+
+function usage() {
+    cat <<EOF
+usage: ${exec_name} [-i] [--] [<file> ...]
+Pretty-prints JSON.
+Given no arguments, formats stdin and writes to stdout.
+Otherwise, creates corresponding files with the extension ".pp.json".
+
+Options:
+    -i            in-place; overwrite original file (ignored for stdin)
+    -n            dry run; just print commands that would be executed
+    --            stop interpreting command-line options
+    -h, --help    show this usage information
+EOF
+}
+
+inplace='false'
+declare -a srcs
+endparams='false'
+dry='false'
+while [ $# -gt 0 -a "${endparams}" = 'false' ]; do
+    case "$1" in
+        -h|--help) usage; exit 0 ;;
+        -i) inplace='true' ;;
+        -n) dry='true' ;;
+        --) endparams='true' ;;
+        *) srcs+=( "$1" ) ;;
+    esac
+    shift
+done
+srcs+=( "$@" )
+
+if [ "${#srcs[@]}" -eq 0 -o '(' "${#srcs[@]}" -eq 1 -a "${srcs[0]}" = '-' ')' ]; then
+    exec jq -S --indent 4 .
+fi
+
+for src in "${srcs[@]}"; do
+    if [ "${inplace}" = 'true' ]; then
+        if [ "${dry}" = 'true' ]; then
+            dst='%tmp'
+        else
+            dst="$(mktemp -t 'jsonpp.XXXXXXXX')"
+        fi
+    else
+        dst="${src%.json}.pp.json"
+    fi
+
+    if [ "${dry}" = 'true' ]; then
+        printf '+ jq -S --indent 4 . %q > %q\n' "${src}" "${dst}"
+    else
+        jq -S --indent 4 . "${src}" > "${dst}"
+        rc=$?
+        if [ "${rc}" -ne 0 ]; then
+            printf '%s: %q: jq exited with %d\n' "${exec_name}" "${src}" "${rc}" >&2
+            exit 1
+        elif [ "$(stat -c '%s' "${src}")" -ne 0 -a "$(stat -c '%s' "${dst}")" -eq 0 ]; then
+            # jq does this silently for some malformed JSON: no output, exit 0
+            printf '%s: %q: no output (%q)\n' "${exec_name}" "${src}" "${dst}" >&2
+            exit 1
+        fi
+    fi
+
+    if [ "${inplace}" = 'true' ]; then
+        if [ "${dry}" = 'true' ]; then
+            printf '+ mv %q %q\n' "${dst}" "${src}"
+        else
+            mv "${dst}" "${src}"
+            rc=$?
+            if [ "${rc}" -ne 0 ]; then
+                printf '%s: %q: mv error when replacing with %q\n' "${exec_name}" "${src}" "${dst}" >&2
+                exit 1
+            fi
+        fi
+    fi
+done

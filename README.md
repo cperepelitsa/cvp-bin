@@ -12,29 +12,33 @@ Most also say useful things when run with "-h" or without arguments.
 
 # Tools
 
+- **approve**: run a command for each file, prompt to keep or delete (requires zsh and rlwrap)
+
+- **apt-search**: APT package search with more pleasant output
+
 - **arith**: outputs some statistical information for a list of numbers
 
 - **badchar**: check files for bytes outside the pretty/printable ASCII range
 
 - **cstat**: dumps the C stat(2) struct for a file
 
-- **decolor**: extremely simple `sed` filter to remove terminfo color escapes
+- **decolor**: removes terminfo color escapes from text
 
 - **exts**: outputs counts by file extension of a list of files
 
-- **floatdump**: dumps IEEE 754 binary representation of floats
-
 - **genpass**: generates passwords
 
-- **gzipip**: compresses a file in-place (very dangerous)
+- **git-squash**: squash commits in a dev branch into a single commit
 
-- **lsd**: list directories in current working dir
+- **gzipip**: compresses a file in-place (risky!)
 
-- **lsf**: list files in current working dir
+- **joinl**: joins consecutive lines of text
+
+- **jsonpp**: JSON pretty-printer with actually helpful options (requires `jq`)
+
+- **manless**: wrapper that adds a simple theme to the `less` pager when viewing `man` pages
 
 - **minus**: filters out arguments from list given on stdin
-
-- **pacman-group**: reformat output of `pacman` and `yay` into columns
 
 - **pargrep**: find paragraphs in indented notes
 
@@ -44,14 +48,12 @@ Most also say useful things when run with "-h" or without arguments.
 
 - **statv**: dumps everything coreutils' `stat` binary can tell you, somewhat nicely
 
-- **swapnames**: swaps the names of two files
+- **swap**: swaps the names of two files
 
 - **tdiff**: outputs duration between timestamps
 
-- **vcut**: runs mpv; screenshots taken determine start/end times for clips to extract
-  (requires mpv, ffmpeg, and dc)
+- **tcopy**: copies stdin to a tmux buffer
 
-- **vinf**: dump basic audio and video encoding information for media files (requires
-  ffmpeg)
+- **tpaste**: pastes last tmux-buffer to stdout
 
-- **wgetr**: recursively download an offline copy of a website
+- **xmlpp**: XML/HTML pretty-printer with actually helpful options (requires `xmllint`)

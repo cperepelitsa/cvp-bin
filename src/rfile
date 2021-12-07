@@ -2,8 +2,11 @@
 
 # Outputs a random filename from the current directory (recursively).
 
+r='-maxdepth 1'
+if [ "$1" = '-r' ]; then r= ; shift; fi
+
 if [ $# -eq 0 ]; then
-    exec find . -type f | shuf -n1
+    exec find . $r -type f | shuf -n1
 else
-    exec find "$@" -type f | shuf -n1   
+    exec find "$@" $r -type f | shuf -n1   
 fi
